@@ -8,7 +8,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Mesaj veya görsel boş olamaz.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_ANAHTARI;
     if (!apiKey) {
         return res.status(500).json({ error: 'API anahtarı sunucuda tanımlanmamış!' });
     }
@@ -41,10 +41,17 @@ export default async function handler(req, res) {
         });
 
         const data = await response.json();
+        
+        if (!response.ok) {
+            console.error("Google API Hatası:", data);
+            return res.status(500).json({ error: data.error?.message || 'Google API yanıt vermedi.' });
+        }
+
         const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Yanıt alınamadı.";
 
         return res.status(200).json({ text: aiText });
     } catch (error) {
+        console.error("Sunucu Hatası:", error);
         return res.status(500).json({ error: error.message });
     }
 }
