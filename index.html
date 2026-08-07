@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gemini: {
+                            dark: '#131314',
+                            card: '#1e1f20',
+                            border: '#333537',
+                            accent: '#8ab4f8',
+                            hover: '#2d2f31'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .message-content pre { background: #1e1f20; padding: 1rem; border-radius: 0.5rem; margin-top: 0.5rem; overflow-x: auto; border: 1px solid #333537; }
+        .message-content code { font-family: monospace; color: #8ab4f8; }
+        .message-content p { margin-bottom: 0.75rem; }
+        .message-content p:last-child { margin-bottom: 0; }
+    </style>
+</head>
+<body class="bg-white dark:bg-gemini-dark text-gray-800 dark:text-gray-100 h-screen flex overflow-hidden transition-colors duration-200">
+
+    <!-- Sol Kenar Çubuğu -->
+    <aside id="sidebar" class="w-64 bg-gray-50 dark:bg-gemini-card border-r border-gray-200 dark:border-gemini-border flex flex-col transition-all duration-300 z-20">
+        <div class="p-4 flex items-center justify-between">
+            <button onclick="newChat()" class="flex items-center space-x-2 bg-gray-200 dark:bg-gemini-hover hover:bg-gray-300 dark:hover:bg-zinc-700 px-4 py-2.5 rounded-full text-sm font-medium transition w-full">
+                <i class="fa-solid fa-plus text-blue-400"></i>
+                <span>Yeni Sohbet</span>
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-3 py-2 space-y-1" id="chat-history-list">
+            <div class="text-xs font-semibold text-gray-400 px-3 py-2">Son Sohbetler</div>
+        </div>
+    </aside>
+
+    <!-- Ana Alan -->
+    <div class="flex-1 flex flex-col h-full relative">
+        <header class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gemini-border bg-white dark:bg-gemini-dark">
+            <div class="flex items-center space-x-3">
+                <button onclick="toggleSidebar()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gemini-hover transition text-gray-500 dark:text-gray-400">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <span class="text-xl font-semibold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+                    <i class="fa-solid fa-bolt mr-2 text-yellow-400"></i>Flash AI
+                </span>
+            </div>
+            <div class="flex items-center space-x-3">
+                <button onclick="openVoiceCall()" class="flex items-center space-x-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 px-3 py-1.5 rounded-full text-sm transition border border-blue-500/30">
+                    <i class="fa-solid fa-phone-volume"></i>
+                    <span class="hidden sm:inline">Canlı Sesli Arama</span>
+                </button>
+                <button onclick="toggleTheme()" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gemini-hover transition">
+                    <i id="theme-icon" class="fa-solid fa-moon text-lg"></i>
+                </button>
+            </div>
+        </header>
+
+        <main id="chat-container" class="flex-1 overflow-y-auto px-4 py-6 space-y-6 max-w-4xl w-full mx-auto">
+            <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center px-4">
+                <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500 bg-clip-text text-transparent mb-2">
+                    Selam, Nasıl Yardımcı Olabilirim?
+                </h1>
+                <p class="text-gray-500 dark:text-gray-400 mb-8">Aklına ne geliyorsa sor, birlikte çözelim.</p>
+            </div>
+        </main>
+
+        <footer class="p-4 max-w-4xl w-full mx-auto">
+            <!-- Görsel Önizleme Kutusu -->
+            <div id="image-preview-container" class="hidden mb-2 flex items-center space-x-2 bg-gray-100 dark:bg-gemini-card p-2 rounded-xl w-fit border border-gray-200 dark:border-gemini-border">
+                <img id="image-preview" src="" alt="Önizleme" class="w-12 h-12 object-cover rounded-lg">
+                <span id="image-name" class="text-xs text-gray-400 truncate max-w-xs"></span>
+                <button type="button" onclick="removeImage()" class="text-red-400 hover:text-red-500 p-1"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form id="chat-form" class="relative flex items-center bg-gray-100 dark:bg-gemini-card rounded-2xl border border-gray-200 dark:border-gemini-border px-4 py-3 shadow-sm focus-within:ring-2 focus-within:ring-blue-500/50">
+                <!-- Gizli Dosya Seçici -->
+                <input type="file" id="image-input" accept="image/*" class="hidden" onchange="handleImageSelect(event)">
+                <button type="button" onclick="document.getElementById('image-input').click()" class="text-gray-400 hover:text-blue-400 p-2 transition mr-2" title="Fotoğraf Ekle">
+                    <i class="fa-solid fa-image text-lg"></i>
+                </button>
+
+                <textarea id="user-input" rows="1" placeholder="Flash AI'a bir şeyler sor..." 
+                    class="w-full bg-transparent border-none focus:outline-none resize-none max-h-32 text-gray-800 dark:text-gray-100 placeholder-gray-400"></textarea>
+                
+                <div class="flex items-center space-x-2 ml-2">
+                    <button type="submit" id="send-btn" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-xl transition disabled:opacity-50">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </form>
+            <div class="text-center mt-2">
+                <span class="text-xs text-gray-400">Yapay zeka hata yapabilir. Önemli bilgileri kontrol et.</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Canlı Sesli Arama Modalı -->
+    <div id="voice-call-modal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden flex flex-col items-center justify-center z-50 px-4">
+        <div class="relative flex flex-col items-center text-center max-w-md w-full">
+            <button onclick="closeVoiceCall()" class="absolute -top-16 right-0 text-gray-400 hover:text-white text-2xl p-2">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="relative mb-8">
+                <div class="w-32 h-32 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-white text-4xl shadow-2xl animate-pulse">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div class="absolute inset-0 rounded-full border-4 border-blue-400/50 animate-ping"></div>
+            </div>
+            <h2 id="call-status" class="text-2xl font-bold text-white mb-2">Dinliyor...</h2>
+            <p id="call-transcript" class="text-gray-300 text-sm mb-8 h-12 overflow-y-auto px-4">Konuşmaya başla, Flash AI seni dinliyor.</p>
+            <button onclick="closeVoiceCall()" class="bg-red-600 hover:bg-red-700 text-white w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition transform hover:scale-105">
+                <i class="fa-solid fa-phone-slash"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let chats = JSON.parse(localStorage.getItem('flash_ai_chats')) || [];
+        let currentChatId = null;
+        let isCallActive = false;
+        let recognition = null;
+        let selectedBase64Image = null;
+
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const welcomeScreen = document.getElementById('welcome-screen');
+        const chatHistoryList = document.getElementById('chat-history-list');
+
+        renderHistory();
+
+        function toggleTheme() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                icon.classList.replace('fa-sun', 'fa-moon');
+            } else {
+                html.classList.add('dark');
+                icon.classList.replace('fa-moon', 'fa-sun');
+            }
+        }
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-ml-64');
+        }
+
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight) + 'px';
+        });
+
+        function handleImageSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedBase64Image = e.target.result;
+                document.getElementById('image-preview').src = selectedBase64Image;
+                document.getElementById('image-name').textContent = file.name;
+                document.getElementById('image-preview-container').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImage() {
+            selectedBase64Image = null;
+            document.getElementById('image-input').value = '';
+            document.getElementById('image-preview-container').classList.add('hidden');
+        }
+
+        function newChat() {
+            currentChatId = Date.now().toString();
+            chats.unshift({ id: currentChatId, title: 'Yeni Sohbet', messages: [] });
+            saveAndRender();
+            resetScreen();
+        }
+
+        function resetScreen() {
+            chatContainer.innerHTML = `
+                <div id="welcome-screen" class="h-full flex flex-col items-center justify-center text-center px-4">
+                    <h1 class="text-4xl font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-500 bg-clip-text text-transparent mb-2">
+                        Selam, Nasıl Yardımcı Olabilirim?
+                    </h1>
+                    <p class="text-gray-500 dark:text-gray-400 mb-8">Aklına ne geliyorsa sor, birlikte çözelim.</p>
+                </div>
+            `;
+        }
+
+        // --- CANLI SESLİ ARAMA ---
+        function openVoiceCall() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) { alert('Tarayıcın sesli aramayı desteklemiyor.'); return; }
+            document.getElementById('voice-call-modal').classList.remove('hidden');
+            isCallActive = true;
+            startListeningSequence();
+        }
+
+        function closeVoiceCall() {
+            isCallActive = false;
+            if (recognition) recognition.stop();
+            document.getElementById('voice-call-modal').classList.add('hidden');
+            window.speechSynthesis.cancel();
+        }
+
+        function startListeningSequence() {
+            if (!isCallActive) return;
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.lang = 'tr-TR';
+            recognition.interimResults = false;
+
+            document.getElementById('call-status').textContent = "Dinliyor...";
+            document.getElementById('call-transcript').textContent = "Konuşmanı bekliyorum...";
+            recognition.start();
+
+            recognition.onresult = async function(event) {
+                const speechText = event.results[0][0].transcript;
+                document.getElementById('call-transcript').textContent = `Sen: "${speechText}"`;
+                document.getElementById('call-status').textContent = "Flash AI düşünüyor...";
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: speechText })
+                    });
+                    const data = await response.json();
+                    const aiResponseText = data.text || "Yanıt alamadım.";
+
+                    document.getElementById('call-transcript').textContent = `Flash AI: "${aiResponseText}"`;
+                    document.getElementById('call-status').textContent = "Konuşuyor...";
+
+                    speakText(aiResponseText, () => {
+                        if (isCallActive) startListeningSequence();
+                    });
+
+                    if (!currentChatId) newChat();
+                    const currentChat = chats.find(c => c.id === currentChatId);
+                    currentChat.messages.push({ role: 'user', content: speechText });
+                    currentChat.messages.push({ role: 'ai', content: aiResponseText });
+                    saveAndRender();
+                } catch (err) {
+                    document.getElementById('call-status').textContent = "Bir hata oluştu.";
+                }
+            };
+
+            recognition.onerror = function() {
+                if (isCallActive) setTimeout(startListeningSequence, 1000);
+            };
+        }
+
+        function speakText(text, callback) {
+            if (!('speechSynthesis' in window)) { if (callback) callback(); return; }
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'tr-TR';
+            utterance.onend = () => { if (callback) callback(); };
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // --- MESAJ VE GÖRSEL GÖNDERME ---
+        chatForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text && !selectedBase64Image) return;
+
+            if (!currentChatId) {
+                currentChatId = Date.now().toString();
+                chats.unshift({ id: currentChatId, title: (text ? text.slice(0, 25) : 'Fotoğraf') + '...', messages: [] });
+            }
+
+            const currentChat = chats.find(c => c.id === currentChatId);
+            if (currentChat && currentChat.title === 'Yeni Sohbet') {
+                currentChat.title = (text ? text.slice(0, 25) : 'Fotoğraf') + '...';
+            }
+
+            if (welcomeScreen && welcomeScreen.parentNode) welcomeScreen.remove();
+
+            // Kullanıcı mesajını hazırla (resim varsa ekle)
+            let userDisplayContent = text;
+            let imageToSend = selectedBase64Image;
+
+            appendMessage(userDisplayContent, 'user', imageToSend);
+            currentChat.messages.push({ role: 'user', content: userDisplayContent, image: imageToSend });
+            
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            removeImage();
+            saveAndRender();
+
+            const loadingId = 'loading-' + Date.now();
+            appendLoading(loadingId);
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: userDisplayContent, image: imageToSend })
+                });
+                const data = await response.json();
+                const aiResponseText = data.text || "Üzgünüm, bir yanıt alamadım.";
+
+                document.getElementById(loadingId).remove();
+                appendMessage(aiResponseText, 'ai');
+                currentChat.messages.push({ role: 'ai', content: aiResponseText });
+                saveAndRender();
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                appendMessage("Bir hata oluştu: " + err.message, 'ai');
+            }
+        });
+
+        function appendMessage(text, sender, image = null) {
+            const isUser = sender === 'user';
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex items-start space-x-4 max-w-3xl mx-auto w-full ${isUser ? 'justify-end' : ''}`;
+            const avatar = isUser 
+                ? '<div class="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm shrink-0">S</div>'
+                : '<div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0"><i class="fa-solid fa-bolt"></i></div>';
+            
+            const bubbleClass = isUser 
+                ? 'bg-gray-200 dark:bg-gemini-border text-gray-800 dark:text-gray-100 rounded-2xl px-4 py-3 max-w-[80%] break-words'
+                : 'text-gray-800 dark:text-gray-100 py-2 max-w-[80%] message-content break-words w-full';
+            
+            let contentHTML = '';
+            if (image) {
+                contentHTML += `<img src="${image}" class="max-w-xs rounded-xl mb-2 object-cover">`;
+            }
+            if (text) {
+                contentHTML += isUser ? escapeHtml(text) : marked.parse(text);
+            }
+
+            messageDiv.innerHTML = isUser ? `<div class="${bubbleClass}">${contentHTML}</div>${avatar}` : `${avatar}<div class="${bubbleClass}">${contentHTML}</div>`;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendLoading(id) {
+            const messageDiv = document.createElement('div');
+            messageDiv.id = id;
+            messageDiv.className = `flex items-start space-x-4 max-w-3xl mx-auto w-full`;
+            messageDiv.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-sm shrink-0"><i class="fa-solid fa-bolt"></i></div>
+                <div class="py-3 text-gray-400 flex items-center space-x-2">
+                    <i class="fa-solid fa-circle-notch animate-spin"></i>
+                    <span>Düşünüyor...</span>
+                </div>
+            `;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function saveAndRender() {
+            localStorage.setItem('flash_ai_chats', JSON.stringify(chats));
+            renderHistory();
+        }
+
+        function renderHistory() {
+            chatHistoryList.innerHTML = '<div class="text-xs font-semibold text-gray-400 px-3 py-2">Son Sohbetler</div>';
+            chats.forEach(chat => {
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left px-3 py-2 rounded-lg text-sm truncate transition ${chat.id === currentChatId ? 'bg-gray-200 dark:bg-gemini-hover font-medium' : 'hover:bg-gray-100 dark:hover:bg-gemini-hover/50 text-gray-600 dark:text-gray-300'}`;
+                btn.textContent = chat.title;
+                btn.onclick = () => loadChat(chat.id);
+                chatHistoryList.appendChild(btn);
+            });
+        }
+
+        function loadChat(id) {
+            currentChatId = id;
+            const chat = chats.find(c => c.id === id);
+            chatContainer.innerHTML = '';
+            if (chat && chat.messages.length > 0) {
+                chat.messages.forEach(msg => appendMessage(msg.content, msg.role, msg.image));
+            } else {
+                resetScreen();
+            }
+            renderHistory();
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
+</body>
+</html>
